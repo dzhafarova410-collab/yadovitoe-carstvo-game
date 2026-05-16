@@ -4,16 +4,596 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ядовитое царство — мини-квест</title>
+  <style>
+    :root {
+      --bg1: #f8efe6;
+      --bg2: #e9d6c5;
+      --ink: #34231f;
+      --muted: #7b6258;
+      --gold: #b88845;
+      --rose: #b96b6b;
+      --jade: #5d7f73;
+      --paper: rgba(255, 250, 240, 0.88);
+      --shadow: rgba(52, 35, 31, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 225, 214, .75), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(177, 137, 85, .35), transparent 40%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      overflow-x: hidden;
+    }
+
+    .petals {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .petal {
+      position: absolute;
+      width: 10px;
+      height: 18px;
+      background: rgba(216, 146, 146, .38);
+      border-radius: 80% 20% 80% 20%;
+      animation: fall linear infinite;
+    }
+
+    @keyframes fall {
+      from { transform: translateY(-10vh) rotate(0deg); opacity: .9; }
+      to { transform: translateY(110vh) rotate(360deg); opacity: .1; }
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(960px, 94vw);
+      margin: 0 auto;
+      padding: 38px 0 60px;
+    }
+
+    .hero, .card {
+      background: var(--paper);
+      border: 1px solid rgba(184, 136, 69, .38);
+      box-shadow: 0 24px 70px var(--shadow);
+      border-radius: 28px;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      padding: clamp(24px, 5vw, 48px);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero:before, .hero:after {
+      content: "";
+      position: absolute;
+      border: 1px solid rgba(184, 136, 69, .24);
+      border-radius: 999px;
+      width: 380px;
+      height: 380px;
+      pointer-events: none;
+    }
+
+    .hero:before { top: -240px; left: -120px; }
+    .hero:after { bottom: -250px; right: -160px; }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 7vw, 72px);
+      letter-spacing: .02em;
+      line-height: .95;
+    }
+
+    .subtitle {
+      margin: 18px auto 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: clamp(16px, 2.2vw, 20px);
+      line-height: 1.55;
+    }
+
+    .mode-grid {
+      margin-top: 26px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    .mode-btn, .choice-btn, .restart-btn {
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(184, 136, 69, .92), rgba(147, 90, 66, .92));
+      color: #fffaf0;
+      padding: 18px 20px;
+      box-shadow: 0 12px 30px rgba(139, 87, 56, .25);
+      font-size: 17px;
+      line-height: 1.35;
+    }
+
+    .mode-btn:hover, .choice-btn:hover, .restart-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 40px rgba(139, 87, 56, .32);
+    }
+
+    .mode-title { display: block; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .mode-desc { display: block; opacity: .9; }
+
+    .game { display: none; margin-top: 22px; }
+    .game.active { display: block; }
+
+    .card { padding: clamp(22px, 4vw, 38px); }
+
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(184, 136, 69, .35);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, .38);
+    }
+
+    .scene-title {
+      font-size: clamp(26px, 4vw, 44px);
+      line-height: 1.08;
+      margin: 0 0 14px;
+    }
+
+    .scene-text {
+      color: #4a3731;
+      font-size: 19px;
+      line-height: 1.62;
+      margin: 0 0 24px;
+      white-space: pre-line;
+    }
+
+    .choices {
+      display: grid;
+      gap: 12px;
+    }
+
+    .choice-btn {
+      width: 100%;
+      text-align: left;
+      background: rgba(255, 250, 240, .88);
+      color: var(--ink);
+      border: 1px solid rgba(184, 136, 69, .42);
+      box-shadow: 0 8px 24px rgba(52, 35, 31, .08);
+    }
+
+    .choice-btn:hover {
+      background: rgba(255, 244, 224, .98);
+    }
+
+    .stats {
+      margin: 18px 0 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .42);
+      border: 1px solid rgba(184, 136, 69, .24);
+      text-align: center;
+    }
+
+    .stat strong { display: block; font-size: 21px; }
+    .stat span { color: var(--muted); font-size: 13px; }
+
+    .result-title { font-size: clamp(30px, 5vw, 54px); margin: 0 0 12px; }
+    .result-text { font-size: 19px; line-height: 1.65; color: #4a3731; white-space: pre-line; }
+    .restart-btn { margin-top: 22px; }
+
+    .quote {
+      margin-top: 22px;
+      padding: 18px 20px;
+      border-left: 4px solid var(--gold);
+      background: rgba(255, 255, 255, .38);
+      border-radius: 16px;
+      color: #5b443b;
+      font-style: italic;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 720px) {
+      .mode-grid { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
-<body style="font-family: Georgia, serif; background:#f8efe6; display:flex; align-items:center; justify-content:center; min-height:100vh;">
-  <div style="background:white; padding:40px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,.1); text-align:center; max-width:700px;">
-    <h1 style="font-size:48px; margin-bottom:20px;">Ядовитое царство</h1>
-    <p style="font-size:22px; color:#6d5147;">
-      Мини-квест по мотивам истории
-    </p>
-    <p style="margin-top:30px; font-style:italic; color:#8a6a5c;">
-      «В основе любого плана лежит продуманная стратегия поведения»
-    </p>
-  </div>
+<body>
+  <div class="petals" id="petals"></div>
+
+  <main class="wrap">
+    <section class="hero" id="start">
+      <h1>Ядовитое царство</h1>
+      <p class="subtitle">Мини-квест по мотивам истории: выбери, как вести свою партию — тихо, красиво, ядовито или прямо в пропасть.</p>
+      <div class="mode-grid">
+        <button class="mode-btn" onclick="startGame('faofe')">
+          <span class="mode-title">♟️ Партия в фаофэ</span>
+          <span class="mode-desc">Стратегия, союзы, ловушки и шанс стать не фигурой, а игроком.</span>
+        </button>
+        <button class="mode-btn" onclick="startGame('yao')">
+          <span class="mode-title">🐍 Выживешь ли ты в семье Яо?</span>
+          <span class="mode-desc">Проверка на выдержку: улыбки, зависть, наказания и дворцовая вежливость.</span>
+        </button>
+      </div>
+      <div class="quote">«В основе любого плана лежит продуманная стратегия поведения»</div>
+    </section>
+
+    <section class="game" id="game">
+      <div class="card">
+        <div class="topline">
+          <div class="badge" id="modeBadge">♟️ Партия</div>
+          <div class="badge" id="stepBadge">Ход 1 / 10</div>
+        </div>
+        <h2 class="scene-title" id="sceneTitle"></h2>
+        <p class="scene-text" id="sceneText"></p>
+        <div class="choices" id="choices"></div>
+        <div class="stats">
+          <div class="stat"><strong id="sMind">0</strong><span>разум</span></div>
+          <div class="stat"><strong id="sRep">0</strong><span>репутация</span></div>
+          <div class="stat"><strong id="sSafety">0</strong><span>безопасность</span></div>
+          <div class="stat"><strong id="sPoison">0</strong><span>яд</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const petals = document.getElementById('petals');
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div');
+      p.className = 'petal';
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.animationDuration = 8 + Math.random() * 12 + 's';
+      p.style.animationDelay = -Math.random() * 12 + 's';
+      p.style.transform = `rotate(${Math.random() * 360}deg)`;
+      petals.appendChild(p);
+    }
+
+    const games = {
+      faofe: {
+        badge: '♟️ Партия в фаофэ',
+        steps: [
+          {
+            title: 'Ход первый: ты проснулась не там',
+            text: 'Ты — дочь наложницы в доме Яо. Тело слабое, статус почти нулевой, вокруг — чужие улыбки и слишком много правил. Первый ход решит, заметят тебя как жертву или как фигуру.',
+            choices: [
+              ['Сначала молчать и наблюдать', { mind: 2, safety: 1 }],
+              ['Сразу потребовать справедливости', { rep: -1, poison: 2 }],
+              ['Попросить защиты у отца', { safety: -1, poison: 1 }],
+              ['Позаботиться о матери', { mind: 1, rep: 1 }]
+            ]
+          },
+          {
+            title: 'Ход второй: чужой праздник',
+            text: 'Тебя впервые выводят на большой дворцовый праздник. Здесь улыбаются даже те, кто мечтает увидеть твоё падение.',
+            choices: [
+              ['Держаться в тени', { safety: 2 }],
+              ['Пытаться понравиться всем', { rep: 2, poison: 1 }],
+              ['Наблюдать за отношениями между людьми', { mind: 2 }],
+              ['Искать полезные слухи среди слуг', { poison: 1, mind: 1 }]
+            ]
+          },
+          {
+            title: 'Ход третий: старая мадам',
+            text: 'Старая мадам Яо неожиданно обращает на тебя внимание. Её благосклонность может стать спасением… или поводом для чужой ненависти.',
+            choices: [
+              ['Ответить скромно и честно', { rep: 1, mind: 1 }],
+              ['Попытаться впечатлить её', { rep: 2 }],
+              ['Осторожно показать характер', { mind: 2, poison: 1 }],
+              ['Сделать вид, что боишься', { safety: 1 }]
+            ]
+          },
+          {
+            title: 'Ход четвёртый: улыбка Инне Лин',
+            text: 'Главная жена семьи Яо улыбается тебе слишком ласково. Это плохой знак.',
+            choices: [
+              ['Улыбнуться так же вежливо', { poison: 1, rep: 1 }],
+              ['Избегать её любой ценой', { safety: 1 }],
+              ['Попробовать выяснить её цель', { mind: 2 }],
+              ['Показать неприязнь', { poison: 2, rep: -1 }]
+            ]
+          },
+          {
+            title: 'Ход пятый: праздник Красных Лодок',
+            text: 'На празднике всё выглядит прекрасным. Но именно здесь чаще всего рушатся судьбы.',
+            choices: [
+              ['Остаться рядом с охраной', { safety: 2 }],
+              ['Незаметно исчезнуть в толпе', { mind: 1, poison: 1 }],
+              ['Пойти за Хеань', { rep: 1, safety: -1 }],
+              ['Следить за принцами', { mind: 2 }]
+            ]
+          },
+          {
+            title: 'Ход шестой: неожиданный союз',
+            text: 'Шао Сенхан предлагает тебе помощь. Но никто не знает, где заканчивается его интерес и начинается игра.',
+            choices: [
+              ['Принять помощь', { safety: 2, mind: 1 }],
+              ['Согласиться, но не доверять', { mind: 2, poison: 1 }],
+              ['Отказаться', { safety: -1 }],
+              ['Попытаться использовать его', { poison: 2 }]
+            ]
+          },
+          {
+            title: 'Ход седьмой: чужая ошибка',
+            text: 'Твой враг совершил серьёзную ошибку. Никто кроме тебя этого пока не заметил.',
+            choices: [
+              ['Сразу ударить', { poison: 2 }],
+              ['Подождать подходящего момента', { mind: 3 }],
+              ['Сделать вид, что ничего не произошло', { safety: 1 }],
+              ['Попробовать превратить врага в союзника', { rep: 2 }]
+            ]
+          },
+          {
+            title: 'Ход восьмой: любовь или выгода?',
+            text: 'Тебе предлагают союз, который может изменить всё. Но ты не понимаешь: это чувства или очередной расчёт?',
+            choices: [
+              ['Довериться сердцу', { rep: 1, safety: -1 }],
+              ['Довериться логике', { mind: 2 }],
+              ['Использовать чувства как оружие', { poison: 3 }],
+              ['Отказаться от любых привязанностей', { safety: 2 }]
+            ]
+          },
+          {
+            title: 'Ход девятый: поле фаофэ',
+            text: 'Ты понимаешь, что всё происходящее вокруг давно напоминает одну большую партию.',
+            choices: [
+              ['Стать незаметной фигурой', { safety: 1 }],
+              ['Стать игроком', { mind: 3 }],
+              ['Стать ядом для врагов', { poison: 3 }],
+              ['Стать лицом семьи', { rep: 3 }]
+            ]
+          },
+          {
+            title: 'Финальный ход',
+            text: 'Последний ход всегда определяет не только победителя, но и цену победы.',
+            choices: [
+              ['Спасти только близких', { safety: 3 }],
+              ['Разрушить всё ради мести', { poison: 3 }],
+              ['Построить новую партию', { mind: 2, rep: 1 }],
+              ['Исчезнуть из игры', { safety: 2, mind: 1 }]
+            ]
+          }
+        ]
+      },
+      yao: {
+        badge: '🐍 Выживешь ли ты в семье Яо?',
+        steps: [
+          {
+            title: 'Испытание первое: ледяная вода',
+            text: 'Тебя облили холодной водой и закрыли в сарае на ночь. Утром все ждут, что ты будешь сломлена.',
+            choices: [
+              ['Молчать и запомнить', { mind: 2 }],
+              ['Устроить скандал', { poison: 2 }],
+              ['Пожаловаться старшим', { rep: -1 }],
+              ['Найти свидетеля', { mind: 1, rep: 1 }]
+            ]
+          },
+          {
+            title: 'Испытание второе: семейный ужин',
+            text: 'За столом улыбаются все. Значит, скоро кто-то пострадает.',
+            choices: [
+              ['Следить за словами', { mind: 2 }],
+              ['Отвечать колкостями', { poison: 2 }],
+              ['Молчать', { safety: 1 }],
+              ['Очаровать присутствующих', { rep: 2 }]
+            ]
+          },
+          {
+            title: 'Испытание третье: подарок старой мадам',
+            text: 'Неправильный подарок может стать смертельной ошибкой.',
+            choices: [
+              ['Сделать символичный подарок', { mind: 2, rep: 1 }],
+              ['Подарить роскошь', { rep: 2 }],
+              ['Подарить что-то полезное', { safety: 1 }],
+              ['Сделать подарок с двойным смыслом', { poison: 2 }]
+            ]
+          },
+          {
+            title: 'Испытание четвёртое: чужой позор',
+            text: 'При тебе унижают другую девушку. Толпа смеётся.',
+            choices: [
+              ['Помочь ей', { rep: 2 }],
+              ['Сделать вид, что ничего не происходит', { safety: 1 }],
+              ['Использовать ситуацию', { poison: 2 }],
+              ['Наблюдать за реакцией окружающих', { mind: 2 }]
+            ]
+          },
+          {
+            title: 'Испытание пятое: слухи',
+            text: 'О тебе начали распускать слухи.',
+            choices: [
+              ['Игнорировать', { safety: 1 }],
+              ['Ответить ещё более опасным слухом', { poison: 3 }],
+              ['Найти источник', { mind: 2 }],
+              ['Показательно расплакаться', { rep: 1 }]
+            ]
+          },
+          {
+            title: 'Испытание шестое: Юнь Яо',
+            text: 'Юнь откровенно провоцирует тебя при людях.',
+            choices: [
+              ['Улыбнуться', { poison: 1, rep: 1 }],
+              ['Ответить резко', { poison: 2 }],
+              ['Уйти', { safety: 1 }],
+              ['Спровоцировать её сильнее', { mind: 1, poison: 2 }]
+            ]
+          },
+          {
+            title: 'Испытание седьмое: ошибка принца',
+            text: 'Ты случайно узнаёшь опасную тайну принца.',
+            choices: [
+              ['Сохранить тайну', { safety: 2 }],
+              ['Использовать её позже', { mind: 2, poison: 1 }],
+              ['Сразу рассказать другим', { rep: -1 }],
+              ['Попытаться шантажировать', { poison: 3 }]
+            ]
+          },
+          {
+            title: 'Испытание восьмое: наказание',
+            text: 'Тебя хотят сделать виноватой в чужой ошибке.',
+            choices: [
+              ['Тихо принять удар', { safety: 1 }],
+              ['Найти настоящего виновника', { mind: 3 }],
+              ['Подставить другого', { poison: 3 }],
+              ['Просить защиты', { rep: -1 }]
+            ]
+          },
+          {
+            title: 'Испытание девятое: чувство',
+            text: 'Ты понимаешь, что начинаешь кому-то доверять.',
+            choices: [
+              ['Позволить себе чувства', { rep: 1 }],
+              ['Скрыть их', { mind: 2 }],
+              ['Использовать их', { poison: 2 }],
+              ['Разорвать связь', { safety: 2 }]
+            ]
+          },
+          {
+            title: 'Последнее испытание',
+            text: 'Дом Яо не любит слабых. Но ещё больше он боится тех, кто научился играть по собственным правилам.',
+            choices: [
+              ['Стать сильнее системы', { mind: 3 }],
+              ['Стать её ядом', { poison: 3 }],
+              ['Пережить всех', { safety: 3 }],
+              ['Стать идеальной маской', { rep: 3 }]
+            ]
+          }
+        ]
+      }
+    };
+
+    let currentGame = null;
+    let stepIndex = 0;
+    let stats = { mind: 0, rep: 0, safety: 0, poison: 0 };
+
+    function startGame(type) {
+      currentGame = games[type];
+      stepIndex = 0;
+      stats = { mind: 0, rep: 0, safety: 0, poison: 0 };
+      document.getElementById('start').style.display = 'none';
+      document.getElementById('game').classList.add('active');
+      renderStep();
+    }
+
+    function renderStep() {
+      const step = currentGame.steps[stepIndex];
+      document.getElementById('modeBadge').textContent = currentGame.badge;
+      document.getElementById('stepBadge').textContent = `Ход ${stepIndex + 1} / ${currentGame.steps.length}`;
+      document.getElementById('sceneTitle').textContent = step.title;
+      document.getElementById('sceneText').textContent = step.text;
+      const choices = document.getElementById('choices');
+      choices.innerHTML = '';
+      step.choices.forEach(([label, effect]) => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.textContent = label;
+        btn.onclick = () => choose(effect);
+        choices.appendChild(btn);
+      });
+      renderStats();
+    }
+
+    function choose(effect) {
+      Object.keys(effect).forEach(key => stats[key] += effect[key]);
+      stepIndex++;
+      if (stepIndex >= currentGame.steps.length) renderResult();
+      else renderStep();
+    }
+
+    function renderStats() {
+      document.getElementById('sMind').textContent = stats.mind;
+      document.getElementById('sRep').textContent = stats.rep;
+      document.getElementById('sSafety').textContent = stats.safety;
+      document.getElementById('sPoison').textContent = stats.poison;
+    }
+
+    function renderResult() {
+      const gameEl = document.querySelector('#game .card');
+      renderStats();
+      const result = getResult();
+      gameEl.innerHTML = `
+        <h2 class="result-title">${result.title}</h2>
+        <p class="result-text">${result.text}</p>
+        <div class="quote">${result.quote}</div>
+        <button class="restart-btn" onclick="restart()">Начать заново</button>
+      `;
+    }
+
+    function getResult() {
+      const maxKey = Object.entries(stats).sort((a, b) => b[1] - a[1])[0][0];
+      if (stats.poison >= 7) {
+        return {
+          title: '🐍 Ты стала ядом в чаше',
+          text: 'Ты выжила, но мягкой тебя уже никто не назовёт. Ты не бьёшь первой без причины, зато если бьёшь — точно туда, где больнее всего. В доме Яо о тебе будут говорить шёпотом.',
+          quote: '«Врагов стоит встречать с распростёртыми объятиями. Банальная вежливость»'
+        };
+      }
+      if (maxKey === 'mind') {
+        return {
+          title: '♟️ Ты стала игроком',
+          text: 'Ты не самая громкая, не самая богатая и не самая защищённая. Зато ты видишь поле. Ты понимаешь, кто кого двигает, где ловушка и когда лучше промолчать. Это уже не партия против тебя. Это твоя партия.',
+          quote: '«В основе любого плана лежит продуманная стратегия поведения»'
+        };
+      }
+      if (maxKey === 'safety') {
+        return {
+          title: '🌙 Ты выбрала свободу',
+          text: 'Ты не стала сражаться за каждую улыбку и каждое место за столом. Ты выбрала главное: выйти из клетки живой и забрать с собой тех, кто действительно дорог.',
+          quote: '«Спокойствие было редким благом. Истинное спокойствие являлось штилем перед штормом»'
+        };
+      }
+      if (maxKey === 'rep') {
+        return {
+          title: '🏮 Ты стала лицом семьи',
+          text: 'Ты научилась быть безупречной настолько, что даже враги вынуждены аплодировать. Но теперь каждый твой шаг видят, обсуждают и пытаются использовать.',
+          quote: '«Невозможно вечно быть совершенством без грамма негативных эмоций»'
+        };
+      }
+      return {
+        title: '🕯️ Ты пережила дом Яо',
+        text: 'Не идеально. Не без потерь. Но ты осталась на ногах. А в этом мире иногда даже это уже победа.',
+        quote: '«У тебя есть силы. Подняться, когда падаешь…»'
+      };
+    }
+
+    function restart() {
+      location.reload();
+    }
+  </script>
 </body>
 </html>
